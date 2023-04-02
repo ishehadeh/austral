@@ -8,10 +8,19 @@ set -euxo pipefail
 
 opam exec -- dune build
 
+function std() {
+    echo "standard/src/${1}.aui,standard/src/${1}.aum"
+}
+
 function compile() {
-    ./austral compile $1/$2.aui,$1/$2.aum --entrypoint=Example.$2:main --output=testbin
-    ./testbin > actual.txt
+    dir="$1"
+    module="$2"
     echo -n -e "$3" > expected.txt
+
+    shift 3
+    ./austral compile "$@" "$dir/$module.aui,$dir/$module.aum" --entrypoint=Example.$module:main --output=testbin
+    ./testbin > actual.txt
+
     diff actual.txt expected.txt
     rm testbin
     rm actual.txt
@@ -38,3 +47,4 @@ compile examples/array Array "TFT"
 compile examples/buffer Buffer "ae"
 compile examples/haversine Haversine ""
 compile examples/either Either "aa"
+compile examples/gauss-jordan GaussJordan "2.500000 2.500000 2.500000\n2.500000 1.000000 1.000000\n1.000000 1.000000 1.000000\n" "$(std 'Buffer')" "$(std 'Box')"

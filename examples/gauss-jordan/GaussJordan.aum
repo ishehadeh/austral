@@ -1,0 +1,116 @@
+import Standard.Buffer (Buffer, nth, storeNth, initialize, allocateEmpty, destroyFree);
+
+module body Example.GaussJordan is
+    record Matrix[T: Free]: Linear is
+        rows: Index;
+        cols: Index;
+        elements: Buffer[T];
+    end;
+
+    -- generic [T: Free(Printable), R: Region]
+    -- instance Printable(Reference[Matrix[T], R]) is
+    --     method print(value: Reference[Matrix[T], R]): Unit is
+    --         printMatrix(value);
+    --         return nil;
+    --     end;
+
+    --     method printFixedArray(array: FixedArray[Reference[Matrix[T]], R]): Unit is
+    --         return nil;
+    --     end;
+    -- end;
+
+    generic [T: Free, R: Region]
+    function element(matrix: &[Matrix[T], R], row: Index, col: Index): T is
+        let cols: Index := matrix->cols;
+        return nth(&(matrix->elements), (row * cols) + col);
+    end;
+
+    generic [T: Free, R: Region]
+    function storeElement(matrix: &![Matrix[T], R], row: Index, col: Index, value: T): Unit is
+        let cols: Index := matrix->cols;
+        return storeNth(&(matrix->elements), (row * cols) + col, value);
+    end;
+
+    function matrixMulRow(matrix: Matrix[Float64], row: Index, x: Float64): Matrix[Float64] is
+        let { rows: Index, cols: Index, elements: Buffer[Float64] } := matrix;
+        for i from (row * cols) to (row + 1) * cols do
+            -- TODO (language issue): &(matrix.elements) doesn't work, why?
+            let current: Float64 := nth(&elements, i);
+            storeNth(&!elements, i,  x * current);
+        end for;
+
+        return Matrix(
+            rows => rows,
+            cols => cols,
+            elements => elements
+        );
+    end;
+
+    function matrixAddRowMultiple(matrix: Matrix[Float64], row_dest: Index, row_src: Index, factor: Float64): Matrix[Float64] is
+        for col from 0 to matrix.cols do
+            let dest_orig: Float64 := element(&matrix, row_dest, col);
+            let src_orig: Float64 := element(&matrix, row_src, col);
+            storeElement(&!matrix, row_dest, col, dest_orig + (src_orig * factor));
+        end for;
+
+        return matrix;
+    end;
+    
+    generic [T: Free]
+    function matrixSwapRow(matrix: Matrix[T], row1: Index, row2: Index): Matrix[T] is
+        for col from 0 to matrix.cols do
+            let row1_value: T := element(&matrix, row1, col);
+            let row2_value: T := element(&matrix, row2, col);
+            storeElement(&!matrix, row1, col, row2_value);
+            storeElement(&!matrix, row2, col, row1_value);
+        end for;
+
+        return matrix;
+    end;
+
+    generic [T: Free(Printable), R: Region]
+    function printMatrix(matrix: &[Matrix[T], R]): Unit is
+        for row from 0 to matrix->rows - 1 do
+            for col from 0 to matrix->cols - 1 do
+                print(element(matrix, row, col));
+                if col = (matrix->cols - 1) then
+                    print("\n");
+                else
+                    print(" ");
+                end if;
+            end for;
+        end for;
+
+        return nil;
+    end;
+
+    generic [T: Free]
+    function initializeMatrix(rows: Index, cols: Index, zero: T): Matrix[T] is
+        return Matrix(
+            rows => rows,
+            cols => cols,
+            elements => initialize(rows * cols, zero)
+        );
+    end;
+
+    generic [T: Free]
+    function freeMatrix(matrix: Matrix[T]): Unit is
+        let { rows: Index, cols: Index, elements: Buffer[T] } := matrix;
+        destroyFree(elements);
+        return nil;
+    end;
+
+    function main(): ExitCode is
+        let matrix: Matrix[Float64] := initializeMatrix(3, 3, 0.0);
+        for row from 0 to matrix.rows - 1 do
+            for col from 0 to matrix.cols - 1 do
+                storeElement(&!matrix, row, col, 1.0);
+            end for;
+        end for;
+        -- print(&matrix);
+        let matrix1: Matrix[Float64] := matrixMulRow(matrix, 0, 2.5);
+        printMatrix(&matrix1);
+        freeMatrix(matrix1);
+        return ExitSuccess();
+    end;
+end module body.
